@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7f7">
+  <title>コントラストの検出と弁別｜心理学概論</title>
+  <style>
+    :root { color-scheme:light; --ink:#202020; --muted:#666; --edge:#d5d5d5; --surface:#fff; --page:#f7f7f7; }
+    * { box-sizing:border-box; }
+    html { font-family:system-ui,-apple-system,"Yu Gothic","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; }
+    body { margin:0; color:var(--ink); background:var(--page); line-height:1.55; }
+    button, input, select { font:inherit; }
+    button { cursor:pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid #777; outline-offset:3px; }
+    main { max-width:1040px; padding:28px 24px 38px; margin:auto; }
+    header h1 { font-size:clamp(1.4rem, 3vw, 1.85rem); margin:0 0 3px; letter-spacing:.02em; }
+    header p { font-size:.94rem; color:var(--muted); margin:0; }
+    .tabs { display:grid; grid-template-columns:1fr 1fr; border:1px solid #bebebe; background:#fff; margin:22px 0 16px; border-radius:6px; overflow:hidden; }
+    .tab { color:#3a3a3a; border:0; background:white; padding:12px 8px; font-weight:650; font-size:1rem; }
+    .tab + .tab { border-left:1px solid #bebebe; }
+    .tab[aria-selected="true"] { color:white; background:#292929; }
+    .toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin:0 0 15px; }
+    .frequency-label { display:flex; gap:10px; align-items:center; font-size:.9rem; }
+    select { border:1px solid #bbb; background:white; border-radius:5px; padding:7px 10px; color:#222; }
+    .check { display:flex; align-items:center; gap:8px; font-size:.9rem; cursor:pointer; user-select:none; }
+    .check input { width:17px; height:17px; accent-color:#303030; }
+    .panel { background:var(--surface); border:1px solid var(--edge); border-radius:8px; padding:23px 24px 22px; }
+    section[hidden] { display:none !important; }
+    h2 { font-size:1.16rem; margin:0 0 1px; }
+    .intro { color:var(--muted); font-size:.92rem; margin:0 0 18px; }
+    .stim-wrap { max-width:680px; margin:0 auto; }
+    canvas { display:block; background:#858585; width:100%; aspect-ratio:12/7; border:1px solid #bbb; }
+    .pair { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .stim-title { font-weight:600; font-size:.94rem; display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px; gap:8px; }
+    .stim-value { color:#666; font-size:.85rem; font-weight:500; font-variant-numeric:tabular-nums; }
+    .question { margin:18px 0 8px; text-align:center; font-size:.96rem; font-weight:550; }
+    .controls { max-width:680px; margin:17px auto 0; padding-top:15px; border-top:1px solid #e5e5e5; }
+    .control-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+    .control-head label { font-size:.96rem; font-weight:650; }
+    .num { font-size:1.16rem; font-weight:700; font-variant-numeric:tabular-nums; min-width:5em; text-align:right; }
+    .slider { width:100%; display:block; margin:13px 0 3px; accent-color:#333; height:20px; cursor:pointer; }
+    .edges { display:flex; justify-content:space-between; font-size:.78rem; color:#666; }
+    .buttons { display:flex; justify-content:flex-end; margin-top:12px; }
+    .reset { border:1px solid #bfbfbf; color:#333; background:white; border-radius:5px; padding:7px 15px; font-size:.88rem; }
+    .reset:hover { background:#f0f0f0; }
+    .foot { margin:17px 0 0; padding-top:12px; border-top:1px solid var(--edge); color:#666; font-size:.8rem; }
+    @media(max-width:640px) {
+      main { padding:16px 12px 30px; }
+      .panel { padding:17px 13px; }
+      .pair { gap:9px; }
+      .stim-title { font-size:.8rem; }
+      .stim-value { font-size:.74rem; }
+      .question { font-size:.9rem; }
+    }
+    @media print { body { background:white; } .tabs,.toolbar,.controls,.foot { display:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>コントラストの検出と弁別</h1>
+    <p>縞模様のコントラストを変えて、「見える／見えない」「違いがわかる／わからない」を体験します。</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="デモの切り替え">
+    <button class="tab" id="tab-detect" type="button" role="tab" aria-selected="true" aria-controls="detect-panel" data-mode="detect">検出（絶対閾）</button>
+    <button class="tab" id="tab-discriminate" type="button" role="tab" aria-selected="false" aria-controls="discriminate-panel" tabindex="-1" data-mode="discriminate">弁別（弁別閾）</button>
+  </nav>
+
+  <div class="toolbar">
+    <label class="frequency-label" for="frequency">縞模様の細かさ
+      <select id="frequency"><option value="4">粗い</option><option value="8" selected>中程度</option><option value="16">細かい</option></select>
+    </label>
+    <label class="check" for="numbers"><input id="numbers" type="checkbox" checked>コントラストの数値を表示する</label>
+  </div>
+
+  <section id="detect-panel" class="panel" role="tabpanel" aria-labelledby="tab-detect">
+    <h2>検出：縞模様が見えるか</h2>
+    <p class="intro">コントラストを弱くしたり強くしたりして、縞模様が見えるかを確かめてください。</p>
+    <div class="stim-wrap">
+      <canvas id="detect-canvas" width="640" height="372" role="img" aria-label="コントラストを操作できる正弦波縞"></canvas>
+    </div>
+    <p class="question">縞模様が見え始めるのは、どのあたりでしょうか？</p>
+    <div class="controls">
+      <div class="control-head"><label for="detect-slider">コントラスト</label><output id="detect-output" class="num" for="detect-slider">0.0%</output></div>
+      <input class="slider" id="detect-slider" type="range" min="0" max="30" step="0.1" value="0" aria-label="縞模様のコントラスト（検出）">
+      <div class="edges"><span>弱い</span><span>強い</span></div>
+      <div class="buttons"><button id="reset-detect" class="reset" type="button">最初に戻す</button></div>
+    </div>
+  </section>
+
+  <section id="discriminate-panel" class="panel" role="tabpanel" aria-labelledby="tab-discriminate" hidden>
+    <h2>弁別：2つの縞模様の違いがわかるか</h2>
+    <p class="intro">Aのコントラストは固定されています。Bを変化させて、2つの違いを確かめてください。</p>
+    <div class="pair">
+      <div>
+        <div class="stim-title"><span>A｜標準刺激</span><span class="stim-value" id="standard-label">20.0%</span></div>
+        <canvas id="standard-canvas" width="480" height="280" role="img" aria-label="コントラストが固定された標準刺激A"></canvas>
+      </div>
+      <div>
+        <div class="stim-title"><span>B｜比較刺激</span><span class="stim-value" id="comparison-label">20.0%</span></div>
+        <canvas id="comparison-canvas" width="480" height="280" role="img" aria-label="コントラストを操作できる比較刺激B"></canvas>
+      </div>
+    </div>
+    <p class="question">AとBのコントラストの違いは、どの程度小さくなるとわからなくなるでしょうか？</p>
+    <div class="controls">
+      <div class="control-head"><label for="comparison-slider">Bのコントラスト</label><output id="comparison-output" class="num" for="comparison-slider">20.0%</output></div>
+      <input class="slider" id="comparison-slider" type="range" min="0" max="40" step="0.1" value="20" aria-label="比較刺激Bのコントラスト（弁別）">
+      <div class="edges"><span>弱い</span><span>強い</span></div>
+      <div class="buttons"><button id="reset-comparison" class="reset" type="button">Aと同じに戻す</button></div>
+    </div>
+  </section>
+
+  <p class="foot">このデモは知覚を体験するためのもので、閾値を測定・算出するものではありません。数値は公称のMichelsonコントラスト（中心部の輝度変調率）です。実際の輝度コントラストはディスプレイの特性に依存します。「縞模様の細かさ」は画面内の周期数であり、cpdではありません。</p>
+</main>
+
+<script>
+(()=>{
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const detectSlider=$('detect-slider');
+  const comparisonSlider=$('comparison-slider');
+  const frequency=$('frequency');
+  const numbers=$('numbers');
+  const STANDARD=20;
+  const MEAN_L=0.24;
+  let active='detect';
+  let frame=null;
+
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  const format=x=>Number(x).toFixed(1)+'%';
+
+  // Render a linear-luminance sinusoidal grating using an isotropic
+  // 2D Gaussian window, then encode grayscale pixel values as sRGB.
+  // The rendered stimulus is a demonstration, not a calibrated luminance display.
+  const LUT=new Uint8Array(8193);
+  for(let i=0;i<LUT.length;i++){
+    const linear=i/8192;
+    LUT[i]=Math.round(255*(linear<=0.0031308 ? 12.92*linear : 1.055*Math.pow(linear,1/2.4)-0.055));
+  }
+  function draw(canvas,contrast,cycles){
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx)return;
+    const w=canvas.width, h=canvas.height;
+    const image=ctx.createImageData(w,h);
+    const waves=new Float32Array(w);
+    const gaussX=new Float32Array(w), gaussY=new Float32Array(h);
+    const cx=(w-1)/2, cy=(h-1)/2;
+    const sigma=Math.min(w,h)*0.22; // same spread in x and y
+    const twoSigmaSq=2*sigma*sigma;
+    for(let x=0;x<w;x++){
+      const position=(x+.5)/w;
+      const dx=x-cx;
+      waves[x]=Math.sin(2*Math.PI*cycles*position);
+      gaussX[x]=Math.exp(-(dx*dx)/twoSigmaSq);
+    }
+    for(let y=0;y<h;y++){
+      const dy=y-cy;
+      gaussY[y]=Math.exp(-(dy*dy)/twoSigmaSq);
+    }
+    let i=0;
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const envelope=gaussX[x]*gaussY[y];
+        const modulation=(contrast/100)*envelope*waves[x];
+        const luminance=clamp(MEAN_L*(1+modulation),0,1);
+        const c=LUT[Math.round(luminance*8192)];
+        image.data[i++]=c;
+        image.data[i++]=c;
+        image.data[i++]=c;
+        image.data[i++]=255;
+      }
+    }
+    ctx.putImageData(image,0,0);
+  }
+  function updateLabels(){
+    const show=numbers.checked;
+    $('detect-output').textContent=show?format(detectSlider.value):'―';
+    $('comparison-output').textContent=show?format(comparisonSlider.value):'―';
+    $('standard-label').textContent=show?format(STANDARD):'';
+    $('comparison-label').textContent=show?format(comparisonSlider.value):'';
+  }
+  function render(){
+    frame=null;
+    const cycles=Number(frequency.value);
+    if(active==='detect'){
+      draw($('detect-canvas'),Number(detectSlider.value),cycles);
+    } else {
+      draw($('standard-canvas'),STANDARD,cycles);
+      draw($('comparison-canvas'),Number(comparisonSlider.value),cycles);
+    }
+  }
+  function scheduleDraw(){
+    if(frame!==null)cancelAnimationFrame(frame);
+    frame=requestAnimationFrame(render);
+  }
+  function selectMode(mode){
+    active=mode;
+    for(const name of ['detect','discriminate']){
+      const isActive=name===mode;
+      $(name+'-panel').hidden=!isActive;
+      $('tab-'+name).setAttribute('aria-selected',String(isActive));
+      $('tab-'+name).tabIndex=isActive?0:-1;
+    }
+    scheduleDraw();
+  }
+  document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>selectMode(button.dataset.mode)));
+  document.querySelector('.tabs').addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();
+    const next=(event.key==='ArrowRight'||event.key==='End')?'discriminate':'detect';
+    selectMode(next);
+    $('tab-'+next).focus();
+  });
+  for(const slider of [detectSlider,comparisonSlider]){
+    slider.addEventListener('input',()=>{updateLabels();scheduleDraw()});
+  }
+  frequency.addEventListener('change',scheduleDraw);
+  numbers.addEventListener('change',updateLabels);
+  $('reset-detect').addEventListener('click',()=>{detectSlider.value=0;updateLabels();scheduleDraw()});
+  $('reset-comparison').addEventListener('click',()=>{comparisonSlider.value=STANDARD;updateLabels();scheduleDraw()});
+  updateLabels();
+  scheduleDraw();
+})();
+</script>
+</body>
+</html>
